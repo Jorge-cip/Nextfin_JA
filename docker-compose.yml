@@ -1,0 +1,223 @@
+x-dns-config: &dns-config
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+    - 1.1.1.1
+
+services:
+  # ---- SERVICIOS DE NEXTCLOUD ----
+  db_nextcloud:
+    image: postgres:15-alpine
+    container_name: nextcloud-postgres-db
+    restart: always
+    shm_size: '1.25gb'
+    ports:
+      - "${NEXTCLOUD_DB_PORT}:5432"
+    volumes:
+      - ${APP_DATA_PATH}/nextcloud/database:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER_NC}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD_NC}
+      - POSTGRES_DB=${POSTGRES_DB_NC}
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=${DB_MAX_CONNECTIONS}"
+      - "-c"
+      - "shared_buffers=${DB_SHARED_BUFFERS}"
+      - "-c"
+      - "effective_cache_size=${DB_EFFECTIVE_CACHE_SIZE}"
+      - "-c"
+      - "maintenance_work_mem=${DB_MAINTENANCE_WORK_MEM}"
+      - "-c"
+      - "wal_buffers=${DB_WAL_BUFFERS}"
+      - "-c"
+      - "random_page_cost=1.1"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_NC} -d ${POSTGRES_DB_NC}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+  redis_nextcloud:
+    image: redis:7.2-alpine
+    container_name: nextcloud-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_HOST_PASSWORD}
+    networks:
+      - default
+
+  app:
+    image: nextcloud:31.0.7-fpm
+    container_name: nextcloud-app-server
+    restart: always
+    <<: *dns-config
+    volumes:
+      - ${APP_DATA_PATH}/nextcloud/html:/var/www/html
+      - ${MULTIMEDIA_PATH}:${APP_DATA_PATH}/multimedia
+      - ./nextcloud_config/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - ./nextcloud_config/www.conf:/usr/local/etc/php-fpm.d/www.conf
+    environment:
+      - POSTGRES_HOST=db_nextcloud
+      - POSTGRES_USER=${POSTGRES_USER_NC}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD_NC}
+      - POSTGRES_DB=${POSTGRES_DB_NC}
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
+      - REDIS_HOST=${REDIS_HOST_NC}
+      - REDIS_HOST_PASSWORD=${REDIS_HOST_PASSWORD}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT}
+      - PHP_UPLOAD_LIMIT=${PHP_UPLOAD_LIMIT}
+      - TZ=${TZ}
+      - NEXTCLOUD_MAINTENANCE_WINDOW_START=${NEXTCLOUD_MAINTENANCE_WINDOW_START}
+      - DEFAULT_PHONE_REGION=${DEFAULT_PHONE_REGION}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - MAIL_SMTPAUTH=${MAIL_SMTPAUTH}
+      - MAIL_SMTPSECURE=${MAIL_SMTPSECURE}
+      - MAIL_SMTPHOST=${MAIL_SMTPHOST}
+      - MAIL_SMTPPORT=${MAIL_SMTPPORT}
+      - MAIL_SMTPNAME=${MAIL_SMTPNAME}
+      - MAIL_SMTPPASSWORD=${MAIL_SMTPPASSWORD}
+    depends_on:
+      db_nextcloud:
+        condition: service_healthy
+      redis_nextcloud:
+        condition: service_started
+    healthcheck:
+      disable: true
+    networks:
+      - default
+
+  apache:
+    build:
+      context: ./apache_image
+    container_name: nextcloud-apache
+    restart: always
+    <<: *dns-config
+    ports:
+      - "${NEXTCLOUD_PORT}:80"
+    volumes:
+      - ${APP_DATA_PATH}/nextcloud/html:/var/www/html:ro
+      - ./nextcloud_config/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./nextcloud_config/nextcloud.conf:/usr/local/apache2/conf/extra/nextcloud.conf:ro
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - default
+
+  cron:
+    image: nextcloud:31.0.7-fpm
+    container_name: nextcloud-cron-job
+    restart: always
+    <<: *dns-config
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+    volumes:
+      - ${APP_DATA_PATH}/nextcloud/html:/var/www/html
+      - ${MULTIMEDIA_PATH}:${APP_DATA_PATH}/multimedia:ro
+    user: "www-data"
+    entrypoint: /bin/sh -c "while true; do nice -n 19 ionice -c 3 php -f /var/www/html/cron.php; nice -n 19 ionice -c 3 php /var/www/html/occ preview:generate-all -n; sleep 300; done"
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - default
+
+  # ---- ONLYOFFICE ----
+  db_onlyoffice:
+    image: postgres:15-alpine
+    container_name: onlyoffice-postgres-db
+    restart: always
+    volumes:
+      - ${APP_DATA_PATH}/onlyoffice/database:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB_OO}
+      - POSTGRES_USER=${POSTGRES_USER_OO}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD_OO}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_OO} -d ${POSTGRES_DB_OO}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+  rabbitmq_onlyoffice:
+    image: rabbitmq:3.13-management-alpine
+    container_name: onlyoffice-rabbitmq
+    restart: always
+    environment:
+      - TZ=${TZ}
+    networks:
+      - default
+
+  redis_onlyoffice:
+    image: redis:7.2-alpine
+    container_name: onlyoffice-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_HOST_PASSWORD}
+    networks:
+      - default
+
+  documentserver_onlyoffice:
+    image: onlyoffice/documentserver:8.2
+    container_name: onlyoffice-document-server
+    restart: always
+    <<: *dns-config
+    ports:
+      - "${ONLYOFFICE_PORT}:80"
+    volumes:
+      - ${APP_DATA_PATH}/onlyoffice/lib:/var/lib/onlyoffice
+      - ${APP_DATA_PATH}/onlyoffice/logs:/var/log/onlyoffice
+    depends_on:
+      db_onlyoffice:
+        condition: service_healthy
+      rabbitmq_onlyoffice:
+        condition: service_started
+      redis_onlyoffice:
+        condition: service_started
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=db_onlyoffice
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB_OO}
+      - DB_USER=${POSTGRES_USER_OO}
+      - DB_PWD=${POSTGRES_PASSWORD_OO}
+      - AMQP_URI=amqp://guest:guest@rabbitmq_onlyoffice
+      - REDIS_SERVER_HOST=${REDIS_HOST_OO}
+      - REDIS_SERVER_PORT=6379
+      - REDIS_SERVER_PASS=${REDIS_HOST_PASSWORD}
+      - JWT_ENABLED=true
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true
+      - TZ=${TZ}
+    networks:
+      - default
+
+  # ---- JELLYFIN ----
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin-media-server
+    user: ${PUID}:${PGID}
+    restart: always
+    ports:
+      - "${JELLYFIN_PORT}:8096"
+    volumes:
+      - ${JELLYFIN_CONFIG_PATH}:/config
+      - ${MULTIMEDIA_PATH}:/media:ro
+    devices:
+      - /dev/dri:/dev/dri
+    networks:
+      - default
+
+networks:
+  default:
