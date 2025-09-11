@@ -54,9 +54,12 @@ services:
     container_name: nextcloud-app-server
     restart: always
     <<: *dns-config
+    group_add:
+      - "${PGID}"
     volumes:
       - ${APP_DATA_PATH}/nextcloud/html:/var/www/html
-      - ${MULTIMEDIA_PATH}:${APP_DATA_PATH}/multimedia
+      - ${MULTIMEDIA_PATH}:/media/multimedia
+      - ${PAPELERA_MEDIA_PATH}:/media/papelera
       - ./nextcloud_config/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
       - ./nextcloud_config/www.conf:/usr/local/etc/php-fpm.d/www.conf
     environment:
@@ -115,6 +118,8 @@ services:
     container_name: nextcloud-cron-job
     restart: always
     <<: *dns-config
+    group_add:
+      - "${PGID}"
     deploy:
       resources:
         limits:
@@ -122,7 +127,8 @@ services:
           memory: 512M
     volumes:
       - ${APP_DATA_PATH}/nextcloud/html:/var/www/html
-      - ${MULTIMEDIA_PATH}:${APP_DATA_PATH}/multimedia:ro
+      - ${MULTIMEDIA_PATH}:/media/multimedia:ro
+      - ${PAPELERA_MEDIA_PATH}:/media/papelera:ro
     user: "www-data"
     entrypoint: /bin/sh -c "while true; do nice -n 19 ionice -c 3 php -f /var/www/html/cron.php; nice -n 19 ionice -c 3 php /var/www/html/occ preview:generate-all -n; sleep 300; done"
     depends_on:
