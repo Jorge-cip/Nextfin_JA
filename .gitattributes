@@ -1,0 +1,11 @@
+# Establecer el comportamiento por defecto para todos los archivos
+* text=auto eol=lf
+
+# Forzar LF (formato Linux) para los archivos de texto y scripts más comunes
+*.sh    text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.conf  text eol=lf
+*.ini   text eol=lf
+Dockerfile text eol=lf
+.env    text eol=lf
