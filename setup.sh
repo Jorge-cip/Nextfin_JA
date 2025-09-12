@@ -76,15 +76,11 @@ else
     echo "❌ ERROR: No se encontro el archivo .env." >&2; exit 1;
 fi
 
-echo "--- 🔐 Creando o verificando archivo de contraseña para Restic ---"
-if [ ! -f /etc/restic_password ]; then
-    echo "$RESTIC_PASSWORD" | sudo tee /etc/restic_password > /dev/null
-    sudo chmod 600 /etc/restic_password
-    sudo chown $USER:$USER /etc/restic_password
-    echo "    ✅ Archivo /etc/restic_password creado."
-else
-    echo "    ✅ Archivo /etc/restic_password ya existe."
-fi
+echo "--- 🔐 Asegurando que el archivo de contraseña para Restic esté actualizado ---"
+echo "$RESTIC_PASSWORD" | sudo tee /etc/restic_password > /dev/null
+sudo chmod 600 /etc/restic_password
+sudo chown $USER:$USER /etc/restic_password
+echo "    ✅ Archivo /etc/restic_password sincronizado con .env."
 
 echo "--- 📁 Creando estructura de directorios ---"
 sudo mkdir -p "$APP_DATA_PATH/nextcloud/html" \
@@ -114,12 +110,18 @@ echo "✅ Directorios creados y permisos asignados."
 echo "--- 🐋 Creando Dockerfile para Apache con HTTP/2 ---"
 cat << 'EOF' > ./apache_image/Dockerfile
 FROM httpd:2.4-alpine
-RUN apk update && apk add --no-cache apache2-http2
+# Forzar la recreación del usuario www-data con UID/GID 33
+RUN apk update && \
+    (delgroup www-data 2>/dev/null || true) && \
+    (deluser www-data 2>/dev/null || true) && \
+    addgroup -g 33 www-data && \
+    adduser -u 33 -D -G www-data -h /var/www -s /sbin/nologin www-data && \
+    apk add --no-cache apache2-http2 brotli
 EOF
 echo "✅ Dockerfile creado."
 
 echo "--- 🔧 Generando configuraciones PHP-FPM y Apache ---"
-cat << 'EOF' > ./nextcloud_config/uploads.ini
+cat << EOF > ./nextcloud_config/uploads.ini
 [PHP]
 memory_limit = ${PHP_MEMORY_LIMIT}
 upload_max_filesize = ${PHP_UPLOAD_LIMIT}
@@ -137,6 +139,7 @@ opcache.validate_timestamps=0
 opcache.revalidate_freq=600
 opcache.fast_shutdown=1
 opcache.save_comments=1
+opcache.max_wasted_percentage=10
 apc.enabled=1
 apc.shm_size=256M
 apc.enable_cli=1
@@ -145,8 +148,11 @@ realpath_cache_ttl=7200
 session.save_handler = redis
 session.save_path = "tcp://redis_nextcloud:6379?auth=${REDIS_HOST_PASSWORD}"
 session.gc_maxlifetime = 86400
+; --- Optimizacion con JIT (Just-In-Time) ---
+opcache.jit_buffer_size=128M
+opcache.jit=tracing
 EOF
-cat << 'EOF' > ./nextcloud_config/www.conf
+cat << EOF > ./nextcloud_config/www.conf
 [www]
 user = www-data
 group = www-data
@@ -156,7 +162,7 @@ listen.group = www-data
 listen.mode = 0660
 listen.backlog = 511
 pm = dynamic
-pm.max_children = 25
+pm.max_children = 15
 pm.start_servers = 8
 pm.min_spare_servers = 5
 pm.max_spare_servers = 15
@@ -180,7 +186,8 @@ rlimit_core = 0
 pm.status_path = /status
 ping.path = /ping
 EOF
-cat << 'EOF' > ./nextcloud_config/httpd.conf
+
+cat > ./nextcloud_config/httpd.conf <<EOF
 ServerRoot "/usr/local/apache2"
 Listen 80
 LoadModule mpm_event_module modules/mod_mpm_event.so
@@ -196,6 +203,7 @@ LoadModule headers_module modules/mod_headers.so
 LoadModule proxy_module modules/mod_proxy.so
 LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so
 LoadModule deflate_module modules/mod_deflate.so
+LoadModule brotli_module modules/mod_brotli.so
 LoadModule filter_module modules/mod_filter.so
 LoadModule env_module modules/mod_env.so
 LoadModule expires_module modules/mod_expires.so
@@ -203,6 +211,14 @@ LoadModule setenvif_module modules/mod_setenvif.so
 LoadModule alias_module modules/mod_alias.so
 LoadModule log_config_module modules/mod_log_config.so
 LoadModule unixd_module modules/mod_unixd.so
+User www-data
+Group www-data
+# --- Ajuste fino: compatibilidad con clientes móviles y reenvío de IP real ---
+LoadModule remoteip_module modules/mod_remoteip.so
+RemoteIPHeader X-Forwarded-For
+RemoteIPTrustedProxy 172.18.0.0/16
+SetEnvIf X-Forwarded-Proto https HTTPS=on
+# --- Fin ajuste fino ---
 ServerName localhost
 ServerAdmin admin@localhost
 DocumentRoot "/var/www/html"
@@ -212,8 +228,8 @@ ServerTokens Prod
 ServerSignature Off
 Timeout 300
 KeepAlive On
-MaxKeepAliveRequests 100
-KeepAliveTimeout 5
+MaxKeepAliveRequests 200
+KeepAliveTimeout 2
 <IfModule mpm_event_module> 
     StartServers             2
     ServerLimit              4
@@ -243,6 +259,9 @@ AddType image/webp .webp
     AddOutputFilterByType DEFLATE application/javascript
     AddOutputFilterByType DEFLATE application/x-javascript
     AddOutputFilterByType DEFLATE application/json
+</IfModule>
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml application/rss+xml
 </IfModule>
 <IfModule mod_headers.c> 
     Header always set X-Content-Type-Options nosniff
@@ -1284,7 +1303,44 @@ docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite
 docker exec -u www-data nextcloud-app-server php occ config:system:set overwriteprotocol --value="http"
 docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite.cli.url --value="http://${FIRST_DOMAIN}:${NEXTCLOUD_PORT}"
 echo "✅ Configuración de proxy inverso para Nextcloud aplicada."
+
+# --- Configurando trusted_proxies para el proxy inverso (Apache) ---
+echo "--- 🌐 Configurando trusted_proxies para Nextcloud ---"
+# Limpieza idempotente de trusted_proxies (elimina todos los índices previos)
+for i in $(seq 0 9); do
+  docker exec -u www-data nextcloud-app-server php occ config:system:delete trusted_proxies $i 2>/dev/null || true
+done
+
+# --- [MODIFICADO] Lógica simplificada y robusta para trusted_proxies ---
+# Se usará el nombre del servicio 'nextcloud-apache' directamente.
+# Docker lo resolverá a la IP correcta dentro de la red interna.
+APACHE_SERVICE_NAME="nextcloud-apache"
+docker exec -u www-data nextcloud-app-server php occ config:system:set trusted_proxies 0 --value="$APACHE_SERVICE_NAME"
+echo "✅ Contenedor de Apache ('$APACHE_SERVICE_NAME') añadido a trusted_proxies."
+
 # --- FIN DE LA MODIFICACIÓN ---
+
+# --- Configurando trusted_domains de forma idempotente (multi-dominio) ---
+echo "--- 🌐 Configurando trusted_domains para Nextcloud ---"
+# Limpia todos los trusted_domains previos
+for i in $(seq 0 9); do
+  docker exec -u www-data nextcloud-app-server php occ config:system:delete trusted_domains $i 2>/dev/null || true
+done
+# Agrega todos los dominios de la variable, uno por uno
+i=0
+for domain in $NEXTCLOUD_TRUSTED_DOMAINS; do
+  docker exec -u www-data nextcloud-app-server php occ config:system:set trusted_domains $i --value="$domain"
+  i=$((i+1))
+done
+echo "✅ Dominios añadidos a trusted_domains: $NEXTCLOUD_TRUSTED_DOMAINS"
+# --- FIN DE LA MODIFICACIÓN ---
+
+
+# --- Ajustes para compatibilidad total con clientes móviles y redes externas ---
+docker exec -u www-data nextcloud-app-server php occ config:system:set forwarded_for_headers 0 --value="HTTP_X_FORWARDED_FOR"
+docker exec -u www-data nextcloud-app-server php occ config:system:set rate_limit --value="1000"
+docker exec -u www-data nextcloud-app-server php occ config:system:set session_lifetime --value="86400"
+docker exec -u www-data nextcloud-app-server php occ config:system:set session_keepalive --value="false"
 
 # === CONFIGURACIÓN DE ONLYOFFICE CON VERIFICACIÓN ===
 echo "🔧 Configurando OnlyOffice con verificación de salud..."
@@ -1310,13 +1366,25 @@ done
 echo ""
 echo "✅ OnlyOffice está listo."
 
-docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice DocumentServerUrl --value="${ONLYOFFICE_PUBLIC_URL%/}/
-"
+docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice DocumentServerUrl --value="${ONLYOFFICE_PUBLIC_URL%/}/"
 docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice DocumentServerInternalUrl --value="http://documentserver_onlyoffice/"
 docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice jwt_secret --value="${JWT_SECRET}"
 docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice jwt_header --value="Authorization"
 docker exec -u www-data nextcloud-app-server php occ config:app:set onlyoffice jwt_in_body --value="1"
+
+# Fuerza un refresh de la app OnlyOffice (simula el “Guardar” manual)
+docker exec -u www-data nextcloud-app-server php occ app:disable onlyoffice
+docker exec -u www-data nextcloud-app-server php occ app:enable onlyoffice
+
 echo "✅ OnlyOffice configurado y verificado."
+
+# === MEJORAS DE CACHÉ Y DESHABILITAR APPS INNECESARIAS ===
+docker exec -u www-data nextcloud-app-server php occ config:system:set memcache.local --value='\OC\Memcache\APCu'
+docker exec -u www-data nextcloud-app-server php occ config:system:set memcache.locking --value='\OC\Memcache\Redis'
+docker exec -u www-data nextcloud-app-server php occ config:system:set memcache.distributed --value='\OC\Memcache\Redis'
+docker exec -u www-data nextcloud-app-server php occ app:disable recommendations
+docker exec -u www-data nextcloud-app-server php occ app:disable survey_client
+docker exec -u www-data nextcloud-app-server php occ app:disable federation
 
 # === OPTIMIZACIONES DE RENDIMIENTO EFICIENTES ===
 echo "⚡ Aplicando optimizaciones esenciales..."
