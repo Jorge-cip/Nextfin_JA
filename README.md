@@ -1,93 +1,110 @@
+# Nextfin_JA: Tu Nube Personal y Centro Multimedia
 
-# Nextfin_JA
+Nextfin_JA es una suite de auto-alojamiento (self-hosted) preconfigurada que integra **Nextcloud**, **Jellyfin** y **OnlyOffice**, todo orquestado con Docker y diseñado para una implementación rápida en servidores Linux.
 
-## Instalación óptima en servidor Linux
+Esta solución te permite tener tu propia nube personal para archivos, un completo centro multimedia para tus películas y series, y una potente suite de ofimática para editar documentos en línea, todo en un solo lugar y bajo tu control.
 
-### 1. Requisitos previos
+## 📚 Stack de Servicios
 
-- Tener instalado `git` y `dos2unix`:
-  ```bash
-  sudo apt-get update
-  sudo apt-get install git dos2unix
-  ```
+- **Nextcloud:** Plataforma de almacenamiento en la nube, calendario, contactos y mucho más.
+- **Jellyfin:** Servidor de streaming multimedia para organizar y disfrutar tus películas, series y música.
+- **OnlyOffice:** Suite de ofimática compatible con documentos de Microsoft Office.
+- **Apache:** Servidor web de alto rendimiento para servir Nextcloud.
+- **PostgreSQL:** Base de datos robusta para Nextcloud y OnlyOffice.
+- **Redis:** Caché en memoria para acelerar el rendimiento de Nextcloud.
+- **Restic:** Herramienta para copias de seguridad incrementales, seguras y eficientes.
 
-### 2. Clonar el repositorio
+## ✨ Características Principales
 
-Configura git para usar finales de línea LF (opcional pero recomendado):
+- **Instalación Automatizada:** Un único script (`setup.sh`) se encarga de configurar todo el entorno.
+- **Optimización de Rendimiento:** Configuraciones preajustadas para PHP, Apache y Redis para un rendimiento óptimo.
+- **Gestión de Multimedia:** Incluye scripts para optimizar y estandarizar tu biblioteca de imágenes y videos.
+- **Backups Integrados:** Scripts listos para usar que facilitan la creación y restauración de copias de seguridad.
+- **Seguridad Mejorada:** El script configura permisos de archivos y directorios siguiendo buenas prácticas.
+
+---
+
+## 🚀 Instalación (Paso a Paso)
+
+Sigue estos pasos para desplegar la suite. Los comandos están listos para copiar y pegar en tu terminal.
+
+### 1. Requisitos Previos
+
+Solo necesitas tener `git` y `dos2unix` instalados en tu servidor. El script de instalación se encargará del resto de dependencias.
+
 ```bash
-git config --global core.autocrlf input
+sudo apt-get update
+sudo apt-get install -y git dos2unix
 ```
 
-Clona el repositorio:
+### 2. Clonar el Repositorio
+
+Descarga el proyecto desde GitHub y navega al directorio recién creado.
+
 ```bash
 git clone https://github.com/usuario/Nextfin_JA.git
 cd Nextfin_JA
 ```
+*(Reemplaza la URL si tu repositorio es diferente)*
 
-### 3. Verificar y convertir finales de línea
+### 3. Preparar los Scripts
 
-Asegúrate de que los archivos tengan formato Unix (LF):
+Es crucial asegurarse de que los scripts tengan el formato de final de línea correcto (LF) para evitar errores en Linux.
+
 ```bash
+# Convierte los archivos principales
 dos2unix setup.sh .env docker-compose.yml
+
+# Opcional: convierte todos los scripts en la carpeta scripts
+dos2unix scripts/*.sh
 ```
 
-Verifica con:
-```bash
-file setup.sh .env docker-compose.yml
-```
-Deben aparecer como "ASCII text" o "UTF-8 text", sin "CRLF".
+### 4. Dar Permisos de Ejecución
 
-### 4. Dar permisos de ejecución al script
+El script principal necesita permisos para poder ser ejecutado.
 
 ```bash
 chmod +x setup.sh
 ```
 
-### 5. Ejecutar el script de instalación
+### 5. Ejecutar la Instalación
+
+Este es el paso final. El script te guiará, instalará las herramientas necesarias y configurará todo el stack. Se requiere `sudo` porque el script necesita crear directorios, asignar permisos y gestionar los servicios de Docker.
 
 ```bash
 sudo ./setup.sh
 ```
-Durante la instalación, el script puede pedir autorización para instalar herramientas. Confirma cada paso según sea necesario.
+> **Nota:** Durante la instalación, el script puede pedirte autorización para instalar herramientas como Docker, Restic, FFmpeg, etc. Confirma cuando sea necesario. Para una instalación totalmente desatendida, puedes usar la bandera `--assume-yes`: `sudo ./setup.sh --assume-yes`.
 
 ---
 
-## Herramientas instaladas y su función
+## 🛠️ Post-Instalación
 
-- **restic**: Copias de seguridad seguras y rápidas de los datos del proyecto.
-- **docker**: Ejecuta los servicios (Nextcloud, OnlyOffice, Jellyfin, Apache, etc.) en contenedores.
-- **docker compose (v2)**: Orquesta y administra múltiples contenedores Docker.
-- **ffmpeg y ffprobe**: Procesan y analizan archivos multimedia (audio y video).
-- **jq**: Procesa y manipula datos en formato JSON.
-- **bc**: Calculadora de precisión arbitraria para operaciones matemáticas en scripts.
-- **wget**: Descarga archivos desde internet.
-- **unzip**: Descomprime archivos ZIP.
-- **imagemagick (convert)**: Manipula y convierte imágenes.
+Una vez que el script finalice, tendrás acceso a:
 
----
+- **Nextcloud:** `http://<tu-ip-o-dominio>:<puerto>`
+- **Jellyfin:** `http://<tu-ip-o-dominio>:<puerto>`
+- **OnlyOffice:** `http://<tu-ip-o-dominio>:<puerto>`
 
-## Otras acciones importantes del script
+Las credenciales de administrador y las URLs exactas se mostrarán en la terminal al final del proceso de instalación.
 
-- Verifica y carga variables de entorno desde el archivo `.env`.
-- Crea y asegura permisos de directorios necesarios para los servicios.
-- Sincroniza la contraseña de Restic para backups.
-- Genera un Dockerfile personalizado para Apache con soporte HTTP/2.
-- Configura permisos colaborativos en carpetas multimedia y de papelera.
+## 🧰 Uso de Scripts Adicionales
 
----
+El proyecto incluye scripts en la carpeta `/scripts` para tareas de mantenimiento:
 
-## Notas adicionales
-
-- Si el script no se ejecuta, intenta con:
+- **`backup.sh`:** Crea una copia de seguridad incremental de todos tus datos (Nextcloud, Jellyfin, bases de datos, etc.).
   ```bash
-  bash setup.sh
+  sudo /ruta/a/tu/proyecto/scripts/backup.sh
   ```
-- Si tienes archivos adicionales (.yaml, .env, etc.), repite el proceso de conversión con `dos2unix`.
-- Si quieres automatizar la instalación sin confirmaciones, ejecuta:
-  ```bash
-  sudo ./setup.sh --assume-yes
-  ```
+- **`restore.sh`:** Restaura tus datos desde una copia de seguridad existente.
+- **`optimizer_images.sh`:** Herramienta interactiva para estandarizar y optimizar imágenes.
+- **`optimizer_videos.sh`:** Herramienta interactiva para estandarizar y optimizar videos.
 
----
+## 📂 Estructura del Proyecto
 
-¡Listo! Ahora puedes instalar y configurar Nextfin_JA en cualquier servidor Linux siguiendo estos pasos.
+- **`.env`:** Archivo de configuración principal. **Aquí defines tus contraseñas, rutas y dominios.**
+- **`docker-compose.yml`:** Define todos los servicios que se ejecutarán.
+- **`setup.sh`:** Script de instalación y configuración inicial.
+- **`/scripts`:** Contiene las herramientas de mantenimiento (backup, restore, optimizadores).
+- **`/nextcloud_config`:** Configuraciones generadas para Apache y PHP.
+- **`/apache_image`:** Dockerfile para construir una imagen de Apache personalizada.
