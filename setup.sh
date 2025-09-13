@@ -41,17 +41,25 @@ declare -A DEPENDENCIAS=(
 # Verifica Docker Compose v2 por separado
 if ! command -v docker compose &> /dev/null; then
     echo "⚠️ El comando 'docker compose' (v2) no está instalado. Es necesario."
-
+    
     # Lógica de instalación automática
     if $ASSUME_YES_INSTALL; then
         echo "   -> Instalando 'docker-compose-plugin' automáticamente (--assume-yes)..."
-        if command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y docker-compose-plugin;
-        else echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; fi
+        if command -v apt-get &> /dev/null; then 
+            sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+            hash -r # <-- AÑADIR ESTA LÍNEA MÁGICA (refresca la sesión del shell)
+        else 
+            echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; 
+        fi
     else
         read -p "❓ ¿Desea intentar instalarlo ahora? (s/n): " INSTALL_COMPOSE
         if [[ "$INSTALL_COMPOSE" == "s" || "$INSTALL_COMPOSE" == "S" ]]; then
-            if command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y docker-compose-plugin;
-            else echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; fi
+            if command -v apt-get &> /dev/null; then 
+                sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+                hash -r # <-- AÑADIR ESTA LÍNEA MÁGICA (refresca la sesión del shell)
+            else 
+                echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; 
+            fi
         else
             echo "❌ Despliegue cancelado. 'docker compose' es obligatorio." >&2; exit 1;
         fi
