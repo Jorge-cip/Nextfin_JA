@@ -38,31 +38,34 @@ declare -A DEPENDENCIAS=(
     [convert]="imagemagick" # El comando es 'convert', el paquete es 'imagemagick'
 )
 
-# Verifica Docker Compose v2 por separado
+# --- INSTALACIÓN AUTOMÁTICA DE DOCKER COMPOSE v2 ---
+echo "--------------------------------------------------------"
+echo "🔧 Verificando Docker Compose v2..."
+DOCKER_COMPOSE_PLUGIN_DIR="/usr/local/lib/docker/cli-plugins"
+DOCKER_COMPOSE_BIN="$DOCKER_COMPOSE_PLUGIN_DIR/docker-compose"
+
 if ! docker compose version &>/dev/null; then
-    echo "⚠️ 'docker compose' no está disponible. Instalando el binario docker-compose..."
+    echo "⚠️ 'docker compose' no está disponible. Instalando Docker Compose v2 plugin..."
 
-    # Descarga el binario de Docker Compose
-    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-    -o /usr/local/bin/docker-compose
+    # Crear el directorio de plugins si no existe
+    sudo mkdir -p "$DOCKER_COMPOSE_PLUGIN_DIR"
 
-    # Da permisos de ejecución
-    sudo chmod +x /usr/local/bin/docker-compose
+    # Descargar la última versión de Docker Compose v2
+    sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+        -o "$DOCKER_COMPOSE_BIN"
 
-    # Agrega un alias para que 'docker compose' funcione si solo tienes el binario clásico
-    if ! command -v docker compose &>/dev/null && command -v docker-compose &>/dev/null; then
-        sudo ln -s /usr/local/bin/docker-compose /usr/local/bin/docker-compose-v2
-        echo "alias 'docker compose'='docker-compose'" >> ~/.bashrc
-        source ~/.bashrc
+    # Dar permisos de ejecución
+    sudo chmod +x "$DOCKER_COMPOSE_BIN"
+
+    # Verificar instalación
+    if docker compose version &>/dev/null; then
+        echo "✅ Docker Compose v2 instalado correctamente como plugin de Docker."
+    else
+        echo "❌ No se pudo instalar Docker Compose v2 automáticamente. Instala manualmente."
+        exit 1
     fi
-fi
-
-# Verifica de nuevo
-if docker compose version &>/dev/null; then
-    echo "✅ Docker Compose instalado correctamente."
 else
-    echo "❌ No se pudo instalar Docker Compose automáticamente. Instala manualmente."
-    exit 1
+    echo "✅ Docker Compose v2 ya está instalado."
 fi
 
 for cmd in "${!DEPENDENCIAS[@]}"; do
