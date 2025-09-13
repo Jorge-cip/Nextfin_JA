@@ -36,7 +36,8 @@ if ! command -v docker &>/dev/null; then
     echo "⚠️  Docker Engine no encontrado. Instalando automáticamente..."
     curl -fsSL https://get.docker.com | sudo sh
     sudo usermod -aG docker $USER
-    newgrp docker
+    echo "⚠️  Docker Engine instalado. Para que los permisos se apliquen correctamente, cierra y vuelve a entrar en tu sesión antes de continuar."
+    exit 0
 fi
 
 # Verificar e instalar Docker Compose v2 como plugin
