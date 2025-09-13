@@ -25,6 +25,47 @@ echo "--------------------------------------------------------"
 echo "🚀 INICIANDO DESPLIEGUE NEXTCLOUD FPM + APACHE + ONLYOFFICE + JELLYFIN 🚀"
 echo "--------------------------------------------------------"
 
+# ------------------------------------------------------------------
+# INSTALACIÓN AUTOMÁTICA DE DOCKER ENGINE + DOCKER COMPOSE v2
+# ------------------------------------------------------------------
+echo "--------------------------------------------------------"
+echo "🔧 Verificando Docker Engine y Docker Compose v2..."
+
+# Instalar Docker Engine si no está presente
+if ! command -v docker &>/dev/null; then
+    echo "⚠️  Docker Engine no encontrado. Instalando automáticamente..."
+    curl -fsSL https://get.docker.com | sudo sh
+    sudo usermod -aG docker $USER
+    newgrp docker
+fi
+
+# Verificar e instalar Docker Compose v2 como plugin
+DOCKER_COMPOSE_PLUGIN_DIR="/usr/lib/docker/cli-plugins"
+DOCKER_COMPOSE_BIN="$DOCKER_COMPOSE_PLUGIN_DIR/docker-compose"
+
+if ! docker compose version &>/dev/null; then
+    echo "⚠️  Docker Compose v2 no encontrado. Instalando plugin..."
+    sudo mkdir -p "$DOCKER_COMPOSE_PLUGIN_DIR"
+    sudo curl -SL \
+      "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+      -o "$DOCKER_COMPOSE_BIN"
+    sudo chmod +x "$DOCKER_COMPOSE_BIN"
+
+    if docker compose version &>/dev/null; then
+        echo "✅ Docker Compose v2 instalado correctamente."
+        docker compose version
+    else
+        echo "❌ No se pudo instalar Docker Compose v2 automáticamente."
+        exit 1
+    fi
+else
+    echo "✅ Docker Compose v2 ya está instalado."
+    docker compose version
+fi
+# ------------------------------------------------------------------
+# FIN BLOQUE DOCKER + COMPOSE
+# ------------------------------------------------------------------
+
 # Verificación de dependencias mejorada
 declare -A DEPENDENCIAS=(
     [restic]="restic"
