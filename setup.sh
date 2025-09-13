@@ -41,31 +41,32 @@ declare -A DEPENDENCIAS=(
 # --- INSTALACIÓN AUTOMÁTICA DE DOCKER COMPOSE v2 ---
 echo "--------------------------------------------------------"
 echo "🔧 Verificando Docker Compose v2..."
-DOCKER_COMPOSE_PLUGIN_DIR="/usr/local/lib/docker/cli-plugins"
+
+DOCKER_COMPOSE_PLUGIN_DIR="/usr/lib/docker/cli-plugins"
 DOCKER_COMPOSE_BIN="$DOCKER_COMPOSE_PLUGIN_DIR/docker-compose"
 
 if ! docker compose version &>/dev/null; then
-    echo "⚠️ 'docker compose' no está disponible. Instalando Docker Compose v2 plugin..."
+    echo "⚠️  'docker compose' no está disponible. Instalando Docker Compose v2 plugin..."
 
-    # Crear el directorio de plugins si no existe
     sudo mkdir -p "$DOCKER_COMPOSE_PLUGIN_DIR"
 
-    # Descargar la última versión de Docker Compose v2
-    sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-        -o "$DOCKER_COMPOSE_BIN"
+    # --- URL SIN ESPACIOS ---
+    sudo curl -SL \
+      "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+      -o "$DOCKER_COMPOSE_BIN"
 
-    # Dar permisos de ejecución
     sudo chmod +x "$DOCKER_COMPOSE_BIN"
 
-    # Verificar instalación
     if docker compose version &>/dev/null; then
         echo "✅ Docker Compose v2 instalado correctamente como plugin de Docker."
+        docker compose version
     else
         echo "❌ No se pudo instalar Docker Compose v2 automáticamente. Instala manualmente."
         exit 1
     fi
 else
     echo "✅ Docker Compose v2 ya está instalado."
+    docker compose version
 fi
 
 for cmd in "${!DEPENDENCIAS[@]}"; do
