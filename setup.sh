@@ -39,52 +39,30 @@ declare -A DEPENDENCIAS=(
 )
 
 # Verifica Docker Compose v2 por separado
-# Verifica Docker Compose v2 por separado
-if ! docker compose version &> /dev/null; then
-    echo "⚠️ El comando 'docker compose' (v2) no está disponible. Es necesario."
-    
-    # Lógica de instalación automática
-    if $ASSUME_YES_INSTALL; then
-        echo "   -> Instalando 'docker-compose-plugin' automáticamente (--assume-yes)..."
-        if command -v apt-get &> /dev/null; then 
-            sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-        else 
-            echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2
-            exit 1
-        fi
-    else
-        read -p "❓ ¿Desea intentar instalarlo ahora? (s/n): " INSTALL_COMPOSE
-        if [[ "$INSTALL_COMPOSE" == "s" || "$INSTALL_COMPOSE" == "S" ]]; then
-            if command -v apt-get &> /dev/null; then 
-                sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-            else 
-                echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2
-                exit 1
-            fi
-        else
-            echo "❌ Despliegue cancelado. 'docker compose' es obligatorio." >&2
-            exit 1
-        fi
-    fi
+if ! docker compose version &>/dev/null; then
+    echo "⚠️ 'docker compose' no está disponible. Instalando el binario docker-compose..."
 
-    # Verificación final tras el intento de instalación
-    if ! docker compose version &> /dev/null; then
-        echo "⚠️ El plugin no se detecta correctamente. Instalando docker-compose binario como respaldo..."
-        sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
-        sudo chmod +x /usr/local/bin/docker-compose
-        # Enlazar docker-compose v2 como plugin si falta (opcional, para compatibilidad)
-        if ! docker compose version &> /dev/null; then
-            sudo ln -s /usr/local/bin/docker-compose /usr/local/bin/docker-compose-v2 || true
-        fi
-    fi
+    # Descarga el binario de Docker Compose
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/bin/docker-compose
 
-    # Chequeo final y ABORTA si no se pudo instalar
-    if docker compose version &> /dev/null; then
-        echo "✅ 'docker compose' está instalado y disponible."
-    else
-        echo "❌ No se pudo instalar 'docker compose' automáticamente. Instala manualmente y vuelve a intentar." >&2
-        exit 1
+    # Da permisos de ejecución
+    sudo chmod +x /usr/local/bin/docker-compose
+
+    # Agrega un alias para que 'docker compose' funcione si solo tienes el binario clásico
+    if ! command -v docker compose &>/dev/null && command -v docker-compose &>/dev/null; then
+        sudo ln -s /usr/local/bin/docker-compose /usr/local/bin/docker-compose-v2
+        echo "alias 'docker compose'='docker-compose'" >> ~/.bashrc
+        source ~/.bashrc
     fi
+fi
+
+# Verifica de nuevo
+if docker compose version &>/dev/null; then
+    echo "✅ Docker Compose instalado correctamente."
+else
+    echo "❌ No se pudo instalar Docker Compose automáticamente. Instala manualmente."
+    exit 1
 fi
 
 for cmd in "${!DEPENDENCIAS[@]}"; do
