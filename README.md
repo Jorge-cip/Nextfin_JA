@@ -30,11 +30,11 @@ Sigue estos pasos para desplegar la suite. Los comandos están listos para copia
 
 ### 1. Requisitos Previos
 
-Solo necesitas tener `git` y `dos2unix` instalados en tu servidor. El script de instalación se encargará del resto de dependencias.
+Solo necesitas tener `git` instalado en tu servidor. El script de instalación se encargará del resto de dependencias.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y git dos2unix
+sudo apt-get install -y git 
 ```
 
 ### 2. Clonar el Repositorio
@@ -47,19 +47,7 @@ cd Nextfin_JA
 ```
 *(Reemplaza la URL si tu repositorio es diferente)*
 
-### 3. Preparar los Scripts
-
-Es crucial asegurarse de que los scripts tengan el formato de final de línea correcto (LF) para evitar errores en Linux.
-
-```bash
-# Convierte los archivos principales
-dos2unix setup.sh .env docker-compose.yml
-
-# Opcional: convierte todos los scripts en la carpeta scripts
-dos2unix scripts/*.sh
-```
-
-### 4. Dar Permisos de Ejecución
+### 3. Dar Permisos de Ejecución
 
 El script principal necesita permisos para poder ser ejecutado.
 
@@ -67,16 +55,30 @@ El script principal necesita permisos para poder ser ejecutado.
 chmod +x setup.sh
 ```
 
-### 5. Ejecutar la Instalación
+### 4. Ejecutar la Instalación
 
-Este es el paso final. El script te guiará, instalará las herramientas necesarias y configurará todo el stack. Se requiere `sudo` porque el script necesita crear directorios, asignar permisos y gestionar los servicios de Docker.
+Este es el paso final. El script te guiará, instalará las herramientas necesarias y configurará todo el stack.
+Se requiere sudo porque el script necesita crear directorios, asignar permisos y gestionar los servicios de Docker.
 
 ```bash
-sudo ./setup.sh
+sudo ./setup.sh 
 ```
 > **Nota:** Durante la instalación, el script puede pedirte autorización para instalar herramientas como Docker, Restic, FFmpeg, etc. Confirma cuando sea necesario. Para una instalación totalmente desatendida, puedes usar la bandera `--assume-yes`: `sudo ./setup.sh --assume-yes`.
 
 ---
+### 5. Si te pide reiniciar sesión
+
+- Haz caso al mensaje.
+- Cierra sesión y vuelve a entrar, o ejecutar.
+
+### 6. Ejecutar el script nuevamente
+
+Después de reiniciar sesión, vuelve a ejecutar el script:
+
+```bash
+sudo ./setup.sh 
+```
+> **Nota:** Durante la instalación, el script puede pedirte autorización para instalar herramientas como Docker, Restic, FFmpeg, etc. Confirma cuando sea necesario. Para una instalación totalmente desatendida, puedes usar la bandera `--assume-yes`: `sudo ./setup.sh --assume-yes`.
 
 ## 🛠️ Post-Instalación
 
@@ -108,3 +110,9 @@ El proyecto incluye scripts en la carpeta `/scripts` para tareas de mantenimient
 - **`/scripts`:** Contiene las herramientas de mantenimiento (backup, restore, optimizadores).
 - **`/nextcloud_config`:** Configuraciones generadas para Apache y PHP.
 - **`/apache_image`:** Dockerfile para construir una imagen de Apache personalizada.
+
+## 👨‍💻 Autor y Versión
+
+-   **Desarrollador:** JAAG
+-   **Fecha:** Septiembre, 2025
+-   **Versión:** 1.0
