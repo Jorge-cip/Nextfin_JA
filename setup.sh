@@ -39,15 +39,14 @@ declare -A DEPENDENCIAS=(
 )
 
 # Verifica Docker Compose v2 por separado
-if ! command -v docker compose &> /dev/null; then
-    echo "⚠️ El comando 'docker compose' (v2) no está instalado. Es necesario."
+if ! docker compose version &> /dev/null; then
+    echo "⚠️ El comando 'docker compose' (v2) no está disponible. Es necesario."
     
     # Lógica de instalación automática
     if $ASSUME_YES_INSTALL; then
         echo "   -> Instalando 'docker-compose-plugin' automáticamente (--assume-yes)..."
         if command -v apt-get &> /dev/null; then 
             sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-            hash -r # <-- AÑADIR ESTA LÍNEA MÁGICA (refresca la sesión del shell)
         else 
             echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; 
         fi
@@ -56,7 +55,6 @@ if ! command -v docker compose &> /dev/null; then
         if [[ "$INSTALL_COMPOSE" == "s" || "$INSTALL_COMPOSE" == "S" ]]; then
             if command -v apt-get &> /dev/null; then 
                 sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-                hash -r # <-- AÑADIR ESTA LÍNEA MÁGICA (refresca la sesión del shell)
             else 
                 echo "    ❌ No se pudo determinar el gestor de paquetes. Por favor, instale 'docker-compose-plugin' manualmente." >&2; exit 1; 
             fi
@@ -66,10 +64,10 @@ if ! command -v docker compose &> /dev/null; then
     fi
 
     # Verificación final tras el intento de instalación
-    if ! command -v docker compose &> /dev/null; then
-         echo "❌ La instalación de 'docker compose' falló. Por favor, instálalo manualmente." >&2; exit 1;
+    if ! docker compose version &> /dev/null; then
+         echo "❌ La instalación de 'docker compose' parece haber fallado. Por favor, verifícalo manualmente." >&2; exit 1;
     fi
-    echo "✅ 'docker compose' instalado correctamente."
+    echo "✅ 'docker compose' instalado y verificado correctamente."
 fi
 
 for cmd in "${!DEPENDENCIAS[@]}"; do
