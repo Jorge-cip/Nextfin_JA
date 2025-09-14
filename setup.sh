@@ -1373,8 +1373,7 @@ sleep 30 # Espera adicional para asegurar que todos los comandos 'occ' estén di
 # Usamos el primer dominio de la lista como referencia estable para los trabajos internos (cron, etc.).
 # Esto evita que se generen URLs con 'localhost' y soluciona el problema de redirección.
 FIRST_DOMAIN=$(echo ${NEXTCLOUD_TRUSTED_DOMAINS} | cut -d' ' -f1)
-docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite.cli.url --value="http://${FIRST_DOMAIN}:
-${NEXTCLOUD_PORT}"
+docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite.cli.url --value="http://${FIRST_DOMAIN}:${NEXTCLOUD_PORT}"
 # Las siguientes líneas DEBEN permanecer comentadas para permitir el acceso multi-IP:
 # docker exec -u www-data nextcloud-app-server php occ config:system:set overwritehost --value="..."
 # docker exec -u www-data nextcloud-app-server php occ config:system:set overwriteprotocol --value="..."
