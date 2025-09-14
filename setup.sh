@@ -3,7 +3,7 @@ set -e
 
 # ====================================================================================
 # SCRIPT DE CONFIGURACION, INSTALACION Y GESTION PARA NEXTCLOUD + ONLYOFFICE + JELLYFIN
-# VERSION FPM + APACHE SEPARADOS PARA PRODUCCION - v7.5 (AJUSTE FINO DE SCRIPTS DE OPTIMIZACIÓN)
+# VERSION FPM + APACHE SEPARADOS PARA PRODUCCION - v7.5 (AJUSTE FINO DE SCRIPTS DE OPTIMIZACIÓN))
 # ====================================================================================
 
 # --- PARSING DE ARGUMENTOS ---
