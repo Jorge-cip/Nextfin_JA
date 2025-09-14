@@ -1365,11 +1365,14 @@ echo "⏳ Dando un tiempo adicional para que Nextcloud termine de inicializarse.
 sleep 30 # Espera adicional para asegurar que todos los comandos 'occ' estén disponibles
 
 # --- [MODIFICACIÓN] AJUSTE PARA COMPATIBILIDAD CON APP MÓVIL ---
-echo "--- 🔧 Ajustando configuración de Nextcloud para compatibilidad con la app móvil ---"
-docker exec -u www-data nextcloud-app-server php occ config:system:set overwritehost --value="${FIRST_DOMAIN}:${NEXTCLOUD_PORT}"
-docker exec -u www-data nextcloud-app-server php occ config:system:set overwriteprotocol --value="http"
-docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite.cli.url --value="http://${FIRST_DOMAIN}:${NEXTCLOUD_PORT}"
-echo "✅ Configuración de proxy inverso para Nextcloud aplicada."
+# Se han comentado las directivas 'overwrite' para permitir el acceso multi-IP sin redirección.
+# Nextcloud determinará el host y el protocolo dinámicamente desde la solicitud entrante.
+# Esto es ideal para tu caso de uso con múltiples IPs en una red local.
+# docker exec -u www-data nextcloud-app-server php occ config:system:set overwritehost --value="${FIRST_DOMAIN}:${NEXTCLOUD_PORT}"
+# docker exec -u www-data nextcloud-app-server php occ config:system:set overwriteprotocol --value="http"
+# Para la URL de la CLI, es mejor establecer una que sea genérica y funcione internamente.
+docker exec -u www-data nextcloud-app-server php occ config:system:set overwrite.cli.url --value="http://localhost:${NEXTCLOUD_PORT}"
+echo "✅ Directivas 'overwrite' ajustadas para acceso multi-IP."
 
 # --- Configurando trusted_proxies para el proxy inverso (Apache) ---
 echo "--- 🌐 Configurando trusted_proxies para Nextcloud ---"
