@@ -1179,14 +1179,13 @@ process_image() {
     img_path=$1
     sharpen_opt=$2
     temp_path="${img_path}.tmp"
+    base_name=$(basename -- "$img_path")
 
-    echo -e "${E_GEAR} Procesando: $(basename -- "$img_path")"
-    
-    # 1. Optimizar a un archivo temporal
-    convert "$img_path" -strip -quality 85 -resize "${TARGET_WIDTH}" -interlace Plane $sharpen_opt "$temp_path"
+    # 1. Optimizar a un archivo temporal con compresión mejorada
+    convert "$img_path" -strip -sampling-factor '4:2:0' -quality 80 -resize "${TARGET_WIDTH}" -interlace Plane $sharpen_opt "$temp_path"
 
     # 2. Si la optimización fue exitosa, reemplazar el original
-    if [ $? -eq 0 ]; then
+    if [ $? -eq 0 ] && [ -s "$temp_path" ]; then
         # 2a. Mover el original a la papelera
         trash_relative_path=${img_path#$MULTIMEDIA_PATH/}
         trash_path="$PAPELERA_MEDIA_PATH/$trash_relative_path"
@@ -1200,12 +1199,14 @@ process_image() {
         # 2c. Ajustar permisos para Nextcloud
         sudo chown 33:$PGID "$img_path"
         sudo chmod 664 "$img_path"
-        
-        echo -e "${C_GREEN}${E_CHECK} Reemplazado: $(basename -- "$img_path")${C_RESET}"
+
+        # 2d. Imprimir un solo mensaje de éxito al final
+        echo -e "${C_GREEN}${E_CHECK} Optimizado:${C_RESET} ${base_name}"
     else
         # 3. Si la optimización falló, limpiar el temporal
         rm -f "$temp_path"
-        echo -e "${C_RED}${E_CROSS} ERROR al procesar: $(basename -- "$img_path")${C_RESET}"
+        # 3a. Imprimir un solo mensaje de error al final
+        echo -e "${C_RED}${E_CROSS} ERROR:    ${C_RESET} ${base_name}"
     fi
 }
 export -f process_image
